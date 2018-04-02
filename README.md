@@ -8,19 +8,19 @@
 * set maven dependency
 	```
 	<dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <version>${protobuf.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.tensorflow</groupId>
-            <artifactId>tensorflow</artifactId>
-            <version>1.6.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.tensorflow</groupId>
-            <artifactId>proto</artifactId>
-            <version>1.4.0</version>
-        </dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java</artifactId>
+        <version>${protobuf.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow</artifactId>
+        <version>1.6.0</version>
+    </dependency>
+    <dependency>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>proto</artifactId>
+        <version>1.4.0</version>
+    </dependency>
     ```
 * predict with java
