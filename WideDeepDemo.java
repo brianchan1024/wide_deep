@@ -7,55 +7,56 @@ import org.tensorflow.Tensors;
 
 public class WideDeepDemo {
 
+    public static Feature feature(String... strings) {
+        BytesList.Builder b = BytesList.newBuilder();
+        for (String s : strings) {
+            b.addValue(ByteString.copyFromUtf8(s));
+        }
+        return Feature.newBuilder().setBytesList(b).build();
+    }
+
+    public static Feature feature(float... values) {
+        FloatList.Builder b = FloatList.newBuilder();
+        for (float v : values) {
+            b.addValue(v);
+        }
+        return Feature.newBuilder().setFloatList(b).build();
+    }
+
+
     public static void predictInstance() {
-        try {
-            SavedModelBundle modelBundle = SavedModelBundle.load("./model", "serve");
-            Session session = modelBundle.session();
-            float[] age_val = {30f};
-            byte[][] workclass_val = {"State-gov".getBytes()};
-            float[] fnlwgt_val = {141297f};
-            byte[][] education_val = {"Bachelors".getBytes()};
-            float[] education_num_val = {13f};
-            byte[][] marital_status_val = {"Married-civ-spouse".getBytes()};
-            byte[][] occupation_val = {"Prof-specialty".getBytes()};
-            byte[][] relationship_val = {"Husband".getBytes()};
-            float[] capital_gain_val = {0f};
-            float[] capital_loss_val = {0f};
-            float[] hours_per_week_val = {40f};
+        Features features =
+                Features.newBuilder()
+                        .putFeature("age", feature(30))
+                        .putFeature("workclass", feature("State-gov"))
+                        .putFeature("fnlwgt", feature(141297f))
+                        .putFeature("education", feature("Bachelors"))
+                        .putFeature("education_num", feature(13f))
+                        .putFeature("marital_status", feature("Married-civ-spouse"))
+                        .putFeature("occupation", feature("Prof-specialty"))
+                        .putFeature("relationship", feature("Husband"))
+                        .putFeature("capital_gain", feature(0f))
+                        .putFeature("capital_loss", feature(0f))
+                        .putFeature("hours_per_week", feature(40f))
+                        .build();
+        Example example = Example.newBuilder().setFeatures(features).build();
 
-            Tensor<Float> age = Tensors.create(age_val);
-            Tensor workclass = Tensors.create(workclass_val);
-            Tensor<Float> fnlwgt = Tensors.create(fnlwgt_val);
-            Tensor education = Tensors.create(education_val);
+        try (SavedModelBundle model = SavedModelBundle.load("./model", "serve")) {
+            Session session = model.session();
+            final String xName = "input_example_tensor";
+            final String scoresName = "head/predictions/probabilities:0";
 
-            Tensor<Float> education_num = Tensors.create(education_num_val);
-            Tensor marital_status = Tensors.create(marital_status_val);
-            Tensor occupation = Tensors.create(occupation_val);
-            Tensor relationship = Tensors.create(relationship_val);
-            Tensor<Float> capital_gain = Tensors.create(capital_gain_val);
-            Tensor<Float> capital_loss = Tensors.create(capital_loss_val);
-            Tensor<Float> hours_per_week = Tensors.create(hours_per_week_val);
-
-            Session.Runner runner = session.runner();
-            runner = runner.feed("age", age);
-            runner = runner.feed("workclass", workclass);
-            runner = runner.feed("fnlwgt", fnlwgt);
-            runner = runner.feed("education", education);
-            runner = runner.feed("education_num", education_num);
-            runner = runner.feed("marital_status", marital_status);
-            runner = runner.feed("occupation", occupation);
-            runner = runner.feed("relationship", relationship);
-            runner = runner.feed("capital_gain", capital_gain);
-            runner = runner.feed("capital_loss", capital_loss);
-            runner = runner.feed("hours_per_week", hours_per_week);
-            Tensor<Float> result = runner.fetch("head/predictions/probabilities:0").run().get(0).expect(Float.class);
-
-            float[][] re = result.copyTo(new float[1][2]);
-            System.out.println(re[0][0]);
-            System.out.println(re[0][1]);
-        } catch (Exception e) {
-            System.out.println(e);
-            e.printStackTrace();
+            try (Tensor<String> inputBatch = Tensors.create(new byte[][] {example.toByteArray()});
+                 Tensor<Float> output =
+                         session
+                                 .runner()
+                                 .feed(xName, inputBatch)
+                                 .fetch(scoresName)
+                                 .run()
+                                 .get(0)
+                                 .expect(Float.class)) {
+                System.out.println(Arrays.deepToString(output.copyTo(new float[1][2])));
+            }
         }
     }
 

@@ -1,18 +1,3 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Example code for TensorFlow Wide & Deep Tutorial using tf.estimator API."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -66,75 +51,107 @@ _NUM_EXAMPLES = {
     'validation': 16281,
 }
 
+INPUT_COLUMNS = [
+    # Categorical base columns
+
+    # For categorical columns with known values we can provide lists
+    # of values ahead of time.
+    tf.feature_column.categorical_column_with_vocabulary_list(
+        'gender', [' Female', ' Male']),
+
+    tf.feature_column.categorical_column_with_vocabulary_list(
+        'race',
+        [' Amer-Indian-Eskimo', ' Asian-Pac-Islander',
+         ' Black', ' Other', ' White']
+    ),
+    tf.feature_column.categorical_column_with_vocabulary_list(
+        'education',
+        [' Bachelors', ' HS-grad', ' 11th', ' Masters', ' 9th',
+         ' Some-college', ' Assoc-acdm', ' Assoc-voc', ' 7th-8th',
+         ' Doctorate', ' Prof-school', ' 5th-6th', ' 10th',
+         ' 1st-4th', ' Preschool', ' 12th']),
+    tf.feature_column.categorical_column_with_vocabulary_list(
+        'marital_status',
+        [' Married-civ-spouse', ' Divorced', ' Married-spouse-absent',
+         ' Never-married', ' Separated', ' Married-AF-spouse', ' Widowed']),
+    tf.feature_column.categorical_column_with_vocabulary_list(
+        'relationship',
+        [' Husband', ' Not-in-family', ' Wife', ' Own-child', ' Unmarried',
+         ' Other-relative']),
+    tf.feature_column.categorical_column_with_vocabulary_list(
+        'workclass',
+        [' Self-emp-not-inc', ' Private', ' State-gov',
+         ' Federal-gov', ' Local-gov', ' ?', ' Self-emp-inc',
+         ' Without-pay', ' Never-worked']
+    ),
+
+    # For columns with a large number of values, or unknown values
+    # We can use a hash function to convert to categories.
+    tf.feature_column.categorical_column_with_hash_bucket(
+        'occupation', hash_bucket_size=100, dtype=tf.string),
+    tf.feature_column.categorical_column_with_hash_bucket(
+        'native_country', hash_bucket_size=100, dtype=tf.string),
+
+    # Continuous base columns.
+    tf.feature_column.numeric_column('age'),
+    tf.feature_column.numeric_column('education_num'),
+    tf.feature_column.numeric_column('capital_gain'),
+    tf.feature_column.numeric_column('capital_loss'),
+    tf.feature_column.numeric_column('hours_per_week'),
+]
 
 def build_model_columns():
   """Builds a set of wide and deep feature columns."""
-  # Continuous columns
-  age = tf.feature_column.numeric_column('age')
-  education_num = tf.feature_column.numeric_column('education_num')
-  capital_gain = tf.feature_column.numeric_column('capital_gain')
-  capital_loss = tf.feature_column.numeric_column('capital_loss')
-  hours_per_week = tf.feature_column.numeric_column('hours_per_week')
+  (gender, race, education, marital_status, relationship,
+   workclass, occupation, native_country, age,
+   education_num, capital_gain, capital_loss, hours_per_week) = INPUT_COLUMNS
+  # Build an estimator.
 
-  education = tf.feature_column.categorical_column_with_vocabulary_list(
-      'education', [
-          'Bachelors', 'HS-grad', '11th', 'Masters', '9th', 'Some-college',
-          'Assoc-acdm', 'Assoc-voc', '7th-8th', 'Doctorate', 'Prof-school',
-          '5th-6th', '10th', '1st-4th', 'Preschool', '12th'])
-
-  marital_status = tf.feature_column.categorical_column_with_vocabulary_list(
-      'marital_status', [
-          'Married-civ-spouse', 'Divorced', 'Married-spouse-absent',
-          'Never-married', 'Separated', 'Married-AF-spouse', 'Widowed'])
-
-  relationship = tf.feature_column.categorical_column_with_vocabulary_list(
-      'relationship', [
-          'Husband', 'Not-in-family', 'Wife', 'Own-child', 'Unmarried',
-          'Other-relative'])
-
-  workclass = tf.feature_column.categorical_column_with_vocabulary_list(
-      'workclass', [
-          'Self-emp-not-inc', 'Private', 'State-gov', 'Federal-gov',
-          'Local-gov', '?', 'Self-emp-inc', 'Without-pay', 'Never-worked'])
-
-  # To show an example of hashing:
-  occupation = tf.feature_column.categorical_column_with_hash_bucket(
-      'occupation', hash_bucket_size=1000)
-
-  # Transformations.
+  # Reused Transformations.
+  # Continuous columns can be converted to categorical via bucketization
   age_buckets = tf.feature_column.bucketized_column(
       age, boundaries=[18, 25, 30, 35, 40, 45, 50, 55, 60, 65])
 
   # Wide columns and deep columns.
-  base_columns = [
-      education, marital_status, relationship, workclass, occupation,
+  wide_columns = [
+      # Interactions between different categorical features can also
+      # be added as new virtual features.
+      tf.feature_column.crossed_column(
+          ['education', 'occupation'], hash_bucket_size=int(1e4)),
+      tf.feature_column.crossed_column(
+          [age_buckets, race, 'occupation'], hash_bucket_size=int(1e6)),
+      tf.feature_column.crossed_column(
+          ['native_country', 'occupation'], hash_bucket_size=int(1e4)),
+      gender,
+      native_country,
+      education,
+      occupation,
+      workclass,
+      marital_status,
+      relationship,
       age_buckets,
   ]
 
-  crossed_columns = [
-      tf.feature_column.crossed_column(
-          ['education', 'occupation'], hash_bucket_size=1000),
-      tf.feature_column.crossed_column(
-          [age_buckets, 'education', 'occupation'], hash_bucket_size=1000),
-  ]
-  # crossed_columns does not work in java prediction
-  wide_columns = base_columns #+ crossed_columns
-
+  embedding_size = 8
   deep_columns = [
+      # Use indicator columns for low dimensional vocabularies
+      tf.feature_column.indicator_column(workclass),
+      tf.feature_column.indicator_column(education),
+      tf.feature_column.indicator_column(marital_status),
+      tf.feature_column.indicator_column(gender),
+      tf.feature_column.indicator_column(relationship),
+      tf.feature_column.indicator_column(race),
+
+      # Use embedding columns for high dimensional vocabularies
+      tf.feature_column.embedding_column(
+          native_country, dimension=embedding_size),
+      tf.feature_column.embedding_column(occupation, dimension=embedding_size),
       age,
       education_num,
       capital_gain,
       capital_loss,
       hours_per_week,
-      # indicator_column and embedding_column do not work in java prediction
-      #tf.feature_column.indicator_column(workclass),
-      #tf.feature_column.indicator_column(education),
-      #tf.feature_column.indicator_column(marital_status),
-      #tf.feature_column.indicator_column(relationship),
-      # To show an example of embedding
-      #tf.feature_column.embedding_column(occupation, dimension=8),
   ]
-
   return wide_columns, deep_columns
 
 
@@ -217,6 +234,7 @@ def eval_input_fn(features, labels, batch_size):
 def predict_instance(model):
   predict_x = { 
   'age':[30],
+  'gender': ['Male'],
   'workclass':["State-gov"],
   'fnlwgt':[141297],
   'education':["Bachelors"],
@@ -228,6 +246,12 @@ def predict_instance(model):
   'capital_loss':[0],
   'hours_per_week':[40],
   }
+  for idx in range(len(_CSV_COLUMNS)):
+    k = _CSV_COLUMNS[idx]
+    if k not in predict_x:
+      v = _CSV_COLUMN_DEFAULTS[idx]
+      predict_x[k] = v
+  
   predictions = model.predict(input_fn=lambda:eval_input_fn(predict_x, labels=None, batch_size=100),)
   print(str(predictions))
   for pred_dict in predictions:
@@ -238,28 +262,9 @@ def predict_instance(model):
 
 
 def save_model(model, model_dir="./model"):
-  feature_inputs = {
-  'age': tf.placeholder(dtype=tf.float32, shape=[1,1], name='age'),
-  'fnlwgt': tf.placeholder(dtype=tf.float32, shape=[1,1], name='fnlwgt'),
-  'workclass': tf.placeholder(dtype=tf.string, shape=[1,1], name='workclass') ,
-  'marital_status': tf.placeholder(dtype=tf.string, shape=[1,1], name='marital_status') ,
-  'capital_gain': tf.placeholder(dtype=tf.float32, shape=[1,1], name='capital_gain'),
-  'capital_loss': tf.placeholder(dtype=tf.float32, shape=[1,1], name='capital_loss'),
-  'education': tf.placeholder(dtype=tf.string, shape=[1,1], name='education'),
-  'education_num': tf.placeholder(dtype=tf.float32, shape=[1,1], name='education_num'),
-  'gender': tf.placeholder(dtype=tf.string, shape=[1,1], name='gender'),
-  'hours_per_week': tf.placeholder(dtype=tf.float32, shape=[1,1], name='hours_per_week'),
-  'native_country': tf.placeholder(dtype=tf.string, shape=[1,1], name='native_country'),
-  'occupation': tf.placeholder(dtype=tf.string, shape=[1,1], name='occupation'),
-  'relationship': tf.placeholder(dtype=tf.string, shape=[1,1], name='relationship'),
-  }
-  serving_input_receiver_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(feature_inputs)
-
-  # model is the loaded wide and deep model produced
-  model.export_savedmodel(model_dir,  serving_input_receiver_fn)
-  for n in tf.get_default_graph().as_graph_def().node:
-    print(n.name)
-
+  feature_spec = tf.feature_column.make_parse_example_spec(INPUT_COLUMNS)
+  serving_input_receiver_fn = tf.estimator.export.build_parsing_serving_input_receiver_fn(feature_spec)
+  model.export_savedmodel(model_dir , serving_input_receiver_fn, as_text=True)
 
 def main(unused_argv):
   # Clean up the model directory if present
@@ -281,9 +286,14 @@ def main(unused_argv):
     for key in sorted(results):
       print('%s: %s' % (key, results[key]))
 
-  predict_instance(model)
   save_model(model)
+  predict_instance(model)
 
+
+"""
+show input and output name with cmd:
+saved_model_cli show --dir /SAVED_MODEL_DIR  --all
+"""
 
 if __name__ == '__main__':
   tf.logging.set_verbosity(tf.logging.INFO)
